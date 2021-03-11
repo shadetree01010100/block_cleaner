@@ -1,9 +1,10 @@
+import getpass
 import requests
 
 
 host = input('NIO INSTANCE (http://localhost:8181): ')
 username = input('USERNAME (Admin): ')
-password = input('PASSWORD (Admin): ')
+password = getpass.getpass('PASSWORD (Admin): ')
 
 if not host:
     host = 'http://localhost:8181'
