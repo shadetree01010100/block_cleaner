@@ -16,31 +16,38 @@ auth = (username, password)
 
 def GET(endpoint):
     response = requests.get('{}/{}'.format(host, endpoint), auth=auth)
+    response.raise_for_status()
     return response.json()
 
 def DEL_BLOCK(id):
     response = requests.delete('{}/blocks/{}'.format(host, id), auth=auth)
     response.raise_for_status()
 
-# get blocks used in all service configs
-blocks = []
-for id, config in GET('services').items():
-    if id == '__instance_metadata__':
-        continue
-    for map in config['mappings']:
-        blocks.append(map['mapping'])
-    for block in config['execution']:
-        blocks.append(block['id'])
-
-# get all block configs, and check against blocks used in service configs
-unused_blocks = []
-for id, config in GET('blocks').items():
-    if id not in blocks:
-        if not unused_blocks:
-            # first block found, only detected for printing
-            print('FOUND BLOCKS:')
-        unused_blocks.append(id)
-        print('\t{} ({})'.format(config['name'], config['type']))
+try:
+    # get blocks used in all service configs
+    blocks = []
+    for id, config in GET('services').items():
+        if id == '__instance_metadata__':
+            continue
+        for map in config['mappings']:
+            blocks.append(map['mapping'])
+        for block in config['execution']:
+            blocks.append(block['id'])
+    # get all block configs, and check against blocks used in service configs
+    unused_blocks = []
+    for id, config in GET('blocks').items():
+        if id not in blocks:
+            if not unused_blocks:
+                # first block found, only detected for printing
+                print('FOUND BLOCKS:')
+            unused_blocks.append(id)
+            print('\t{} ({})'.format(config['name'], config['type']))
+except requests.exceptions.ConnectionError as e:
+    print('Failed to connect to \"{}\"'.format(host))
+    exit()
+except requests.exceptions.HTTPError as e:
+    print(e.args[-1])
+    exit()
 
 if not unused_blocks:
     print('No unused blocks found.')
@@ -54,5 +61,12 @@ except KeyboardInterrupt:
     exit()
 
 print('Removing {} unused blocks...'.format(len(unused_blocks)))
-for block in unused_blocks:
-    DEL_BLOCK(block)
+try:
+    for block in unused_blocks:
+        DEL_BLOCK(block)
+except requests.exceptions.ConnectionError as e:
+    print('Failed to connect to \"{}\"'.format(host))
+    exit()
+except requests.exceptions.HTTPError as e:
+    print(e.args[-1])
+    exit()
