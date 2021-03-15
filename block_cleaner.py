@@ -63,7 +63,7 @@ for id, config in GET_BLOCKS().items():
         # this block instance is not referenced in any service,
         if not unused_blocks:
             # this is the first discovered block, so print a table header
-            print('FOUND BLOCKS:')
+            print('Found Unused Blocks:')
         unused_blocks.append(id)
         print('\t{} ({})'.format(config['name'], config['type']))
 
