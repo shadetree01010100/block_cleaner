@@ -3,9 +3,14 @@ import requests
 
 
 # get user input
-host = input('NIO INSTANCE (http://localhost:8181): ')
-username = input('USERNAME (Admin): ')
-password = getpass.getpass('PASSWORD (Admin): ')
+try:
+    host = input('NIO INSTANCE (http://localhost:8181): ')
+    username = input('USERNAME (Admin): ')
+    password = getpass.getpass('PASSWORD (Admin): ')
+except KeyboardInterrupt:
+    # catch and feed a newline for tidy exit
+    print()
+    exit()
 
 # default values
 if not host:
@@ -17,9 +22,9 @@ if not password:
 # basic auth for http requests
 auth = (username, password)
 
-def GET(endpoint):
+def _make_request(method, endpoint):
     try:
-        response = requests.get('{}/{}'.format(host, endpoint), auth=auth)
+        response = method('{}/{}'.format(host, endpoint), auth=auth)
         response.raise_for_status()
     except requests.exceptions.ConnectionError:
         print('Failed to connect to \"{}\"'.format(host))
@@ -27,24 +32,22 @@ def GET(endpoint):
     except requests.exceptions.HTTPError as e:
         print(e.args[-1])
         exit()
-    return response.json()
+    return response
 
-def DEL_BLOCK(id):
-    try:
-        response = requests.delete('{}/blocks/{}'.format(host, id), auth=auth)
-        response.raise_for_status()
-    except requests.exceptions.ConnectionError:
-        print('Failed to connect to \"{}\"'.format(host))
-        exit()
-    except requests.exceptions.HTTPError as e:
-        print(e.args[-1])
-        exit()
+def GET_BLOCKS():
+    return _make_request(requests.get, 'blocks').json()
+
+def GET_SERVICES():
+    return _make_request(requests.get, 'services').json()
+
+def DELETE_BLOCK(id):
+    _make_request(requests.delete, 'blocks/{}'.format(id))
 
 print('working...', end='\r')
 
 # get blocks used in all service configs
 blocks = []
-for id, config in GET('services').items():
+for id, config in GET_SERVICES().items():
     if id == '__instance_metadata__':
         # not a service, ignore it
         continue
@@ -55,7 +58,7 @@ for id, config in GET('services').items():
 
 # get all block configs, and check against blocks used in service configs
 unused_blocks = []
-for id, config in GET('blocks').items():
+for id, config in GET_BLOCKS().items():
     if id not in blocks:
         # this block instance is not referenced in any service,
         if not unused_blocks:
@@ -73,14 +76,18 @@ if not unused_blocks:
 try:
     # use getpasss simply to hide keyboard input while waiting at prompt
     getpass.getpass(
-        '[ENTER] to remove {} unused blocks,\n'
-        '[CTRL]+[C] to exit'.format(len(unused_blocks)))
+        '[ENTER] to remove {} unused block{},\n'
+        '[CTRL]+[C] to exit'.format(
+            len(unused_blocks),
+            's' if len(unused_blocks) > 1 else ''))
 except KeyboardInterrupt:
     # catch and feed a newline for tidy exit
     print()
     exit()
 
 print('working...', end='\r')
-for block in unused_blocks:
-    DEL_BLOCK(block)
-print('Removed {} unused blocks...'.format(len(unused_blocks)))
+for id in unused_blocks:
+    DELETE_BLOCK(id)
+print('Removed {} unused block{}.'.format(
+    len(unused_blocks),
+    's' if len(unused_blocks) > 1 else ''))
